@@ -1,15 +1,22 @@
 import { supabase, Organization } from "@/lib/supabase";
 import { OrgDirectory } from "@/components/OrgDirectory";
 
-export default async function Home() {
-  const { data: orgs, error } = await supabase
-    .from("organizations")
-    .select("*")
-    .eq("status", "active")
-    .order("name");
+export const dynamic = "force-dynamic";
 
-  if (error) {
-    console.error("Failed to fetch organizations:", error);
+export default async function Home() {
+  let orgs: Organization[] | null = null;
+
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("status", "active")
+      .order("name");
+
+    if (error) {
+      console.error("Failed to fetch organizations:", error);
+    }
+    orgs = data as Organization[] | null;
   }
 
   return (
