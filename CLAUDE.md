@@ -9,24 +9,102 @@
 |---|---|
 | Local path | `~/projects/fieldguide/` |
 | GitHub repo | https://github.com/curlyq90/fieldguide |
-| Hosting | Vercel |
+| Hosting | Vercel (auto-deploys from `main`) |
+| Domain | fieldguide.work |
 | Git identity | name: `Tova Soroka`, email: `tova.soroka@gmail.com` |
+| Supabase project | https://supabase.com/dashboard/project/dznsbaqptfmftfkeqacq |
 
-**Critical:** Always set git user config before committing: `git config user.email "tova.soroka@gmail.com"` (already set locally, but verify if issues arise).
+**Critical:** Commits must come from `tova.soroka@gmail.com` or Vercel Hobby plan will block deployment.
 
 ---
 
 ## Tech Stack
 
-- **Plain HTML/CSS/JS** — no framework, no build step, no npm
-- **Fonts:** Fraunces (display/serif) + Barlow (body/UI) via Google Fonts
-- **Single page:** `index.html` — everything lives in one file
-- **No separate CSS or JS files** — all styles and scripts are inline
-- **Data:** Organization listings are hardcoded in a JS array (`const orgs=[...]`)
+- **Next.js** (App Router) with TypeScript
+- **Tailwind CSS** v4 (via `@tailwindcss/postcss`)
+- **Supabase** — PostgreSQL database, auth, RLS
+- **Fonts:** Fraunces (serif/display) + Barlow (sans/body) via `next/font/google`
+- **Package manager:** npm
 
 ---
 
-## CSS Design Tokens (defined in `:root`)
+## Environment Variables
+
+Required in `.env.local` (and in Vercel project settings):
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://dznsbaqptfmftfkeqacq.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from Supabase dashboard>
+```
+
+---
+
+## Project Structure
+
+```
+fieldguide/
+├── prototype/
+│   └── outdoor-careers.html    # Original HTML prototype (design reference)
+├── supabase/
+│   ├── schema.sql              # Database tables, RLS policies, triggers
+│   └── seed.sql                # 75 organizations seed data
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx          # Root layout with fonts + metadata
+│   │   ├── page.tsx            # Homepage (server component, fetches orgs)
+│   │   └── globals.css         # Tailwind imports + theme
+│   ��── components/
+│   │   ├── OrgDirectory.tsx    # Client component: search, filters, card grid
+│   │   └── OrgCard.tsx         # Single organization card
+│   └��─ lib/
+│       └── supabase.ts         # Supabase client + Organization type
+├── .env.local                  # Supabase credentials (gitignored)
+├── CLAUDE.md
+├── next.config.ts
+├── package.json
+└── tsconfig.json
+```
+
+---
+
+## Database (Supabase)
+
+### Tables
+- **organizations** — 75 orgs with name, slug, description, category, location, URLs, status
+- **submissions** — public submission queue (pending/approved/rejected)
+- **dead_link_reports** — broken link reports (pending/fixed/dismissed)
+
+### Categories (7)
+| Slug | Display Label |
+|---|---|
+| `semester-schools` | Semester & Expedition Schools |
+| `independent-schools` | Independent Schools |
+| `outdoor-ed-programs` | Outdoor Ed Programs |
+| `nonprofits` | Nonprofits & Access Orgs |
+| `companies` | Adventure & Outdoor Companies |
+| `public-lands` | Public Lands & Agencies |
+| `industry-orgs` | Industry Orgs & Job Boards |
+
+### Regions (11)
+Pacific Northwest, Mountain West, West Coast, Southwest, Northeast, Mid-Atlantic, Southeast, Midwest, Alaska, International, National / Remote
+
+### RLS Summary
+- Organizations: public SELECT (active only), authenticated for mutations
+- Submissions: public INSERT, authenticated for read/update/delete
+- Dead link reports: public INSERT, authenticated for read/update/delete
+
+---
+
+## Design Reference
+
+The original HTML prototype is preserved at `prototype/outdoor-careers.html`. It contains:
+- The visual design system (topo background, mountain ridge, earth tone palette)
+- All CSS custom properties / design tokens
+- The original copy and voice
+
+Current site uses clean minimal Tailwind. Visual design matching is a future session.
+
+### CSS Design Tokens (from prototype)
 
 ```css
 --cream: #F5F0E6           /* warm background */
@@ -35,8 +113,6 @@
 --forest: #1B3A2D           /* primary green / headings */
 --forest-mid: #2D5E46       /* hover states, focus rings */
 --forest-light: #3E7A5C
---slate: #3B3F42
---slate-light: #6B7075
 --amber: #C87F3B            /* warm accent */
 --amber-light: #E8A95B
 --amber-pale: #FDF3E4
@@ -50,69 +126,25 @@
 --text: #2C2820             /* primary text */
 --text-mid: #5C5549         /* body text */
 --text-light: #8A8279       /* labels, secondary */
---border: #DDD6C8
---border-light: #EAE5DA
---card-bg: rgba(255,255,255,0.72)
---card-hover: rgba(255,255,255,0.92)
 ```
-
----
-
-## Visual Language & Constraints
-
-- Outdoor/topographic aesthetic — cream/forest/amber palette with mountain silhouettes
-- Typography-led — Fraunces serif for headings/display, Barlow sans for body/UI
-- SVG topographic background lines at 6% opacity
-- Mountain ridge SVG hero divider
-- **Do not change copy** — the voice is intentional
-- **Do not introduce frameworks** (React, Tailwind, etc.)
-
----
-
-## Page Architecture (index.html)
-
-### Section Order
-1. **Topo background** — fixed SVG with topographic lines
-2. **Hero** — nav bar, mountain ridge SVG, title, description, stats
-3. **Controls** — sticky search + category filter pills
-4. **Main** — card grid grouped by category (or flat when filtered)
-5. **Suggest modal** — form to suggest a new org (mailto-based)
-6. **Dead link modal** — form to flag broken links (mailto-based)
-7. **Footer** — attribution + suggest button
-
-### Categories (5)
-Each has a color, icon, and CSS class:
-- `schools` — forest green
-- `programs` — river blue
-- `nonprofits` — amber/rust
-- `companies` — ridge brown
-- `industry` — berry purple
-
-### Data Structure
-```js
-{ name: "Org Name", cat: "schools", desc: "Description.", url: "https://..." }
-```
-80+ organizations in `const orgs=[...]` array.
-
-### Features
-- **Search:** filters by name and description (case-insensitive)
-- **Category filters:** pill buttons, "All" default, counts per category
-- **Cards:** name, description, category tag, external link, dead-link flag button
-- **Suggest modal:** mailto form → hello@tovasoroka.com
-- **Dead link modal:** mailto form → hello@tovasoroka.com
-- **Animations:** fadeUp on cards, sticky nav shadow on scroll
 
 ---
 
 ## Deployment Workflow
 
 ```bash
-# 1. Edit files
-# 2. Stage and commit
-git add .
+npm run build          # Verify locally first
+git add <files>
 git commit -m "Description of change"
-git push origin main
-# 3. Vercel auto-deploys from main branch on push
+git push origin main   # Vercel auto-deploys
 ```
 
-**Vercel Hobby plan quirk:** Commits must come from the repo owner's verified GitHub email (`tova.soroka@gmail.com`). Foreign committer emails will block deployment.
+---
+
+## Build Phases
+
+- **Phase 1** (done): Next.js + Supabase + public homepage with search/filters
+- **Phase 2**: Submission form + dead link reporting UI
+- **Phase 3**: Admin panel with Supabase Auth
+- **Phase 4**: Visual design matching the prototype
+- **Phase 5**: Editorial content (/break-in page)
